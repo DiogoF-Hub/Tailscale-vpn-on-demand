@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+STATE="$2"
+
+if [[ "$STATE" == "up" || "$STATE" == "dhcp4-change" || "$STATE" == "dhcp6-change" ]]; then
+    /usr/local/sbin/tailscale-on-demand.sh
+fi
