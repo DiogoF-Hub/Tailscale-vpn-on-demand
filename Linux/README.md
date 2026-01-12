@@ -21,13 +21,14 @@ Linux/
 
 1. **Network change detection**: NetworkManager automatically runs dispatcher scripts when network state changes
 2. **Event filtering**: The dispatcher hook (`99-tailscale-on-demand`) only triggers on relevant events (`up`, `dhcp4-change`, `dhcp6-change`)
-3. **SSID detection**: `tailscale-on-demand.sh` uses `nmcli` to check your current Wi-Fi SSID
+3. **Connection priority detection**: `tailscale-on-demand.sh` uses `nmcli` to check connections with Ethernet taking priority
 4. **Automatic control**:
-   - If connected to a **home network** (SSID matches your list) → Disconnect Tailscale
-   - If connected to any **other network** → Connect Tailscale with DNS/route acceptance
-   - If not on Wi-Fi → Do nothing (exit silently)
+   - If **Ethernet is connected** → Always connect Tailscale (considered untrusted, even if Wi-Fi is also connected)
+   - If **only home Wi-Fi** is connected (SSID matches your list) → Disconnect Tailscale
+   - If **only other Wi-Fi** is connected → Connect Tailscale with DNS/route acceptance
+   - If neither Ethernet nor Wi-Fi → Do nothing (exit silently)
 
-This ensures you're always protected on public/external networks while avoiding unnecessary VPN overhead at home.
+This ensures you're always protected on public/external networks (including all Ethernet) while avoiding unnecessary VPN overhead at home Wi-Fi. Ethernet always takes priority when both connections are active.
 
 ---
 
@@ -73,8 +74,9 @@ sudo systemctl enable --now tailscaled
 ### **Live Test**
 
 1. Connect to your home Wi-Fi → Tailscale should disconnect
-2. Connect to any other network → Tailscale should connect
-3. Switch between networks and verify behavior
+2. Connect to any other Wi-Fi → Tailscale should connect
+3. Connect via Ethernet → Tailscale should connect
+4. Switch between networks and verify behavior
 
 ### **Debug Mode**
 
@@ -84,7 +86,7 @@ To see what the script is doing, you can run it directly:
 sudo /usr/local/sbin/tailscale-on-demand.sh
 ```
 
-If you're on Wi-Fi, it will execute immediately. If not, it exits silently (which is correct behavior).
+If you're on Ethernet or Wi-Fi, it will execute immediately. If not, it exits silently (which is correct behavior).
 
 ---
 
@@ -100,10 +102,12 @@ HOME_SSIDS=("Home_Network" "Home_5G" "Parents_WiFi")
 
 ### **Change Tailscale Connection Flags**
 
-Modify the connection command in the script:
+Modify the `tailscale_connect()` function in the script:
 
 ```bash
-exec tailscale up --accept-dns=false --accept-routes=true --shields-up
+tailscale_connect() {
+    exec tailscale up --accept-dns=false --accept-routes=true --shields-up
+}
 ```
 
 See `tailscale up --help` for all available options.
@@ -119,7 +123,8 @@ See `tailscale up --help` for all available options.
 
 **Tailscale doesn't connect/disconnect**:
 - Run script manually to see if it works: `sudo /usr/local/sbin/tailscale-on-demand.sh`
-- Check your current SSID: `nmcli -t -f active,ssid dev wifi`
+- Check your connection type: `nmcli -t -f TYPE,STATE dev`
+- Check your current SSID (if on Wi-Fi): `nmcli -t -f active,ssid dev wifi`
 - Verify SSID spelling matches exactly in the `HOME_SSIDS` array
 
 **Not working on your distro**:
@@ -132,6 +137,9 @@ See `tailscale up --help` for all available options.
 
 - **NetworkManager dispatcher**: Runs scripts in `/etc/NetworkManager/dispatcher.d/` when network events occur
 - **Event filtering**: Only processes `up`, `dhcp4-change`, and `dhcp6-change` states to avoid redundant executions
-- **Silent failures**: Uses `set -euo pipefail` for strict error handling, exits silently if not on Wi-Fi
-- **Efficient SSID detection**: Uses `nmcli` with awk parsing for fast, reliable SSID extraction
+- **Priority-based detection**: Checks for Ethernet first, then Wi-Fi—Ethernet always takes precedence when both are connected
+- **Ethernet handling**: All Ethernet connections are treated as untrusted (auto-connect), even when home Wi-Fi is also active
+- **Silent failures**: Uses `set -euo pipefail` for strict error handling, exits silently if not on Ethernet/Wi-Fi
+- **Efficient detection**: Uses `nmcli` with awk parsing for fast, reliable connection detection and SSID extraction
+- **Clean functions**: `tailscale_connect()` and `tailscale_disconnect()` functions make the code maintainable
 - **Direct execution**: Uses `exec` to replace the shell process (no lingering processes)
