@@ -5,8 +5,9 @@ set -euo pipefail
 HOME_SSIDS=("SSID_1" "SSID_2")
 
 # Functions for clean Tailscale control
+# Replace --operator=test with your actual operator (user) flag if needed
 tailscale_connect() {
-    exec tailscale up --accept-dns=true --accept-routes=true
+    exec tailscale up --accept-dns --accept-routes --operator=test
 }
 
 tailscale_disconnect() {

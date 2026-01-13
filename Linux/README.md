@@ -60,7 +60,17 @@ sudo cp 99-tailscale-on-demand /etc/NetworkManager/dispatcher.d/
 sudo chmod +x /etc/NetworkManager/dispatcher.d/99-tailscale-on-demand
 ```
 
-### **4. Ensure Required Services Are Running**
+### **4. Set Tailscale Operator (Optional but Recommended)**
+
+Allow your user to control Tailscale without sudo:
+
+```bash
+sudo tailscale set --operator=$USER
+```
+
+This enables the script to run `tailscale` commands as your user, avoiding permission issues.
+
+### **5. Ensure Required Services Are Running**
 
 ```bash
 sudo systemctl enable --now NetworkManager
