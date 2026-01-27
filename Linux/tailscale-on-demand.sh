@@ -5,22 +5,25 @@ set -euo pipefail
 HOME_SSIDS=("SSID_1" "SSID_2")
 
 # Username to run tailscale commands as
-TAILSCALE_USER="myuser"
+TAILSCALE_USER="your_username"
 
 # Functions for clean Tailscale control
 tailscale_connect() {
-    su - "$TAILSCALE_USER" -c "tailscale up --accept-dns --accept-routes"
+    su "$TAILSCALE_USER" -c "tailscale up --accept-dns --accept-routes --operator=\"$TAILSCALE_USER\" --reset"
 }
 
 tailscale_disconnect() {
-    su - "$TAILSCALE_USER" -c "tailscale down"
+    su "$TAILSCALE_USER" -c "tailscale down"
 }
 
 # Check if Ethernet is connected (takes priority)
 HAS_ETHERNET="$(nmcli -t -f TYPE,STATE dev 2>/dev/null | awk -F: '$1=="ethernet" && $2=="connected"{print "yes"; exit}')"
 
-# If on Ethernet, always connect (Its not so easy to identify which ethernet is home, so we assume any ethernet is trusted)
-[[ "$HAS_ETHERNET" == "yes" ]] && tailscale_connect
+# If on Ethernet, always connect (Its not so easy to identify which ethernet is home, so we assume any ethernet is untrusted)
+if [[ "$HAS_ETHERNET" == "yes" ]]; then
+    tailscale_connect
+    exit 0
+fi
 
 # Get active Wi-Fi SSID (only matters if no Ethernet)
 CURRENT_SSID="$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')"
@@ -30,7 +33,10 @@ CURRENT_SSID="$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes
 
 # Check if on home Wi-Fi
 for s in "${HOME_SSIDS[@]}"; do
-    [[ "$CURRENT_SSID" == "$s" ]] && tailscale_disconnect
+    if [[ "$CURRENT_SSID" == "$s" ]]; then
+        tailscale_disconnect
+        exit 0
+    fi
 done
 
 # Not on home Wi-Fi, connect
