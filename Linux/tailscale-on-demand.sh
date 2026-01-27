@@ -4,14 +4,16 @@ set -euo pipefail
 # Home Wi-Fi SSIDs
 HOME_SSIDS=("SSID_1" "SSID_2")
 
+# Username to run tailscale commands as
+TAILSCALE_USER="myuser"
+
 # Functions for clean Tailscale control
-# Replace --operator=test with your actual operator (user) flag if needed
 tailscale_connect() {
-    exec tailscale up --accept-dns --accept-routes --operator=test
+    su - "$TAILSCALE_USER" -c "tailscale up --accept-dns --accept-routes"
 }
 
 tailscale_disconnect() {
-    exec tailscale down
+    su - "$TAILSCALE_USER" -c "tailscale down"
 }
 
 # Check if Ethernet is connected (takes priority)
