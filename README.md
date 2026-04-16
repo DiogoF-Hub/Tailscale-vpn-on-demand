@@ -20,10 +20,21 @@ Each platform has its own README with complete setup instructions.
 
 ## 🚀 Quick Start
 
-1. Choose your platform: [Linux](Linux/README.md) or [Windows](Windows/README.md)
+1. Pick your platform and check prerequisites: [Linux](Linux/README.md#-prerequisites) or [Windows](Windows/README.md#-prerequisites)
 2. Follow the platform-specific setup instructions
 3. Configure your trusted home network SSID(s)
 4. Done! Your VPN will now connect/disconnect automatically
+
+## 🧭 Platform Feature Parity
+
+Both platforms share the same core behavior (home Wi-Fi → disconnect, anything else → connect), but they aren't identical:
+
+| Capability | Linux | Windows |
+|---|---|---|
+| Home Wi-Fi SSID detection | ✅ | ✅ |
+| Ethernet treated as untrusted (auto-connect) | ✅ | ❌ (Wi-Fi only) |
+| Trigger mechanism | NetworkManager dispatcher | Task Scheduler event trigger |
+| Runs silently in background | ✅ | ✅ |
 
 ## 📋 How It Works
 
@@ -41,9 +52,9 @@ The key difference is **how** each platform triggers this logic:
 
 ## 🔧 Configuration
 
-All configuration is done by editing a single array of trusted SSIDs in each platform's main script:
+Configuration is done by editing variables at the top of each platform's main script — no config files:
 
-**Linux**: Edit `HOME_SSIDS` array in `tailscale-on-demand.sh`
-**Windows**: Edit `$homeSSIDs` array in `tailscale.ps1`
+- **Linux** (`tailscale-on-demand.sh`): set the `HOME_SSIDS` array **and** `TAILSCALE_USER` (the user whose Tailscale session the script controls)
+- **Windows** (`tailscale.ps1`): set the `$homeSSIDs` array
 
-No complex config files, just simple string arrays.
+See the platform READMEs for the full setup, including path and Task Scheduler / NetworkManager wiring.
