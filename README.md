@@ -27,12 +27,13 @@ Each platform has its own README with complete setup instructions.
 
 ## 🧭 Platform Feature Parity
 
-Both platforms share the same core behavior (home Wi-Fi → disconnect, anything else → connect), but they aren't identical:
+Both platforms share the same core behavior (home Wi-Fi → disconnect, anything else → connect):
 
 | Capability | Linux | Windows |
 |---|---|---|
 | Home Wi-Fi SSID detection | ✅ | ✅ |
-| Ethernet treated as untrusted (auto-connect) | ✅ | ❌ (Wi-Fi only) |
+| Ethernet treated as untrusted (auto-connect) | ✅ | ✅ |
+| Transition-based logic (manual override survives) | ✅ | ✅ |
 | Trigger mechanism | NetworkManager dispatcher | Task Scheduler event trigger |
 | Runs silently in background | ✅ | ✅ |
 

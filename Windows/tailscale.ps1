@@ -9,20 +9,32 @@ $homeSSIDs = @(
 # only acts on real transitions. Delete this file to force a fresh evaluation.
 $stateFile = Join-Path $PSScriptRoot "last-state.txt"
 
-$currentSSID = (netsh wlan show interfaces) | ForEach-Object {
-    if ($_ -match "^\s+SSID\s+:\s+(.*)$") {
-        $matches[1].Trim()
-    }
-}
+# Ethernet is treated as untrusted (we can't easily tell home vs. elsewhere),
+# mirroring the Linux script. -Physical filters out virtual adapters like
+# Tailscale's own, Hyper-V, and other VPN tunnels.
+$ethernetUp = [bool](Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
+    Where-Object { $_.MediaType -eq '802.3' -and $_.Status -eq 'Up' })
 
-if ([string]::IsNullOrEmpty($currentSSID)) {
-    $currentState = "none"
-}
-elseif ($homeSSIDs -contains $currentSSID) {
-    $currentState = "home"
+if ($ethernetUp) {
+    $currentSSID = ""
+    $currentState = "away"
 }
 else {
-    $currentState = "away"
+    $currentSSID = (netsh wlan show interfaces) | ForEach-Object {
+        if ($_ -match "^\s+SSID\s+:\s+(.*)$") {
+            $matches[1].Trim()
+        }
+    }
+
+    if ([string]::IsNullOrEmpty($currentSSID)) {
+        $currentState = "none"
+    }
+    elseif ($homeSSIDs -contains $currentSSID) {
+        $currentState = "home"
+    }
+    else {
+        $currentState = "away"
+    }
 }
 
 $previousState = if (Test-Path $stateFile) { (Get-Content $stateFile -Raw).Trim() } else { "" }
