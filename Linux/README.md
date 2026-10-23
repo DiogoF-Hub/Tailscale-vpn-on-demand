@@ -22,10 +22,10 @@ Linux/
 1. **Network change detection**: NetworkManager automatically runs dispatcher scripts when network state changes
 2. **Event filtering**: The dispatcher hook (`99-tailscale-on-demand`) only triggers on relevant events (`up`, `dhcp4-change`, `dhcp6-change`)
 3. **Connection priority detection**: `tailscale-on-demand.sh` uses `nmcli` to check connections with Ethernet taking priority (Ethernet is always treated as `away`/untrusted, even if Wi-Fi is also connected)
-4. **Transition-based control**: The script classifies the current network as `home`, `away`, or `none` and compares it against the last trust state stored in `/var/lib/tailscale-on-demand.state`. It only acts when the trust state actually changes:
+4. **Transition-based control**: The script classifies the current network as `home`, `away`, or `none` and compares it against the last trust state stored in `/var/lib/tailscale-on-demand.state`. Away is always enforced; home only acts on a transition:
    - **`away` → `home`** (you came home on Wi-Fi) → Disconnect Tailscale
-   - **`home` → `away`** (you left home, or plugged in Ethernet) → Connect Tailscale
-   - **Same state as before** (e.g. DHCP renewal, Wi-Fi blip) → Do nothing
+   - **Any `away` network** (you left home, plugged in Ethernet, or Tailscale got stopped while away) → Connect Tailscale if `tailscale status` says it isn't running
+   - **`home` → `home`** (e.g. DHCP renewal, Wi-Fi blip) → Do nothing
    - **`none`** (no Ethernet and no Wi-Fi) → Do nothing
 
 This ensures you're always protected on public/external networks (including all Ethernet) while avoiding unnecessary VPN overhead at home — and it lets you **manually `tailscale up` while at home** (e.g. to use a Mullvad exit node) without the next dispatcher event undoing it. The next time you actually leave and come back home, the script will disconnect again.
@@ -215,8 +215,8 @@ See `tailscale up --help` for all available options.
 - **Event filtering**: Only processes `up`, `dhcp4-change`, and `dhcp6-change` states to avoid redundant executions
 - **Priority-based detection**: Checks for Ethernet first, then Wi-Fi—Ethernet always takes precedence when both are connected
 - **Ethernet handling**: All Ethernet connections are classified as `away` (auto-connect), even when home Wi-Fi is also active
-- **Trust-state machine**: Each run derives a state (`home` / `away` / `none`) and compares it to the previous state stored in `/var/lib/tailscale-on-demand.state`. Only `home↔away` transitions trigger Tailscale changes; `none` is never persisted, so a momentary network drop won't cause a reconnect cycle.
-- **Manual override at home**: Because the script only reacts to transitions, running `tailscale up` yourself while at home is preserved — the next dispatcher event finds `home → home` and exits without touching Tailscale.
+- **Trust-state machine**: Each run derives a state (`home` / `away` / `none`) and compares it to the previous state stored in `/var/lib/tailscale-on-demand.state`. Arriving home (`away→home`) disconnects; any run on an `away` network connects Tailscale if `tailscale status` reports it isn't running; `none` is never persisted, so a momentary network drop won't cause a reconnect cycle.
+- **Manual override at home**: Because home only reacts to transitions, running `tailscale up` yourself while at home is preserved — the next dispatcher event finds `home → home` and exits without touching Tailscale.
 - **Force re-evaluation**: `sudo rm /var/lib/tailscale-on-demand.state` to make the next run treat the current network as a fresh transition.
 - **Silent failures**: Uses `set -euo pipefail` for strict error handling, exits silently when there's no actionable state change
 - **Efficient detection**: Uses `nmcli` with awk parsing for fast, reliable connection detection and SSID extraction

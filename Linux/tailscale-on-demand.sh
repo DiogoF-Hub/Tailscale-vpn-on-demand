@@ -45,15 +45,21 @@ fi
 PREVIOUS_STATE=""
 [[ -f "$STATE_FILE" ]] && PREVIOUS_STATE="$(cat "$STATE_FILE" 2>/dev/null || true)"
 
-# Act only on trust-state transitions; ignore "none" (no network)
+# Act on trust state; ignore "none" (no network)
 if [[ "$CURRENT_STATE" == "none" ]]; then
     exit 0
-elif [[ "$CURRENT_STATE" == "$PREVIOUS_STATE" ]]; then
-    exit 0
-elif [[ "$CURRENT_STATE" == "home" ]]; then
-    tailscale_disconnect
 elif [[ "$CURRENT_STATE" == "away" ]]; then
-    tailscale_connect
+    # Away is always enforced: connect whenever Tailscale isn't running
+    # (manual disconnect, client restart, failed up), not just on transitions.
+    # `tailscale status` exits non-zero when stopped or logged out.
+    if ! tailscale status >/dev/null 2>&1; then
+        tailscale_connect
+    fi
+elif [[ "$CURRENT_STATE" == "$PREVIOUS_STATE" ]]; then
+    # Home only acts on transitions, so a manual `tailscale up` at home survives
+    exit 0
+else
+    tailscale_disconnect
 fi
 
 # Persist only home/away so a brief network drop doesn't trigger a reconnect cycle

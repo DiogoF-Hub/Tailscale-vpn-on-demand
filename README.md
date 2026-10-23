@@ -44,12 +44,12 @@ Both implementations follow the same logic:
 1. Monitor network state changes (new connections, DHCP renewals)
 2. Classify the current network as `home` (matches your SSID list) or `away` (anything else)
 3. Compare against the last state stored in a small state file
-4. Only act on real transitions:
+4. Act on the result:
    - `away → home` → Disconnect Tailscale
-   - `home → away` → Connect Tailscale
-   - Same state as before → Do nothing
+   - Any `away` network → Connect Tailscale if it isn't already running (checked every run, not only on transitions)
+   - `home → home` → Do nothing
 
-This transition-based design means you can **manually `tailscale up` at home** (e.g. to use a Mullvad exit node) without the script immediately reverting it. The next time you actually leave and come back, the script will disconnect again.
+Because home only reacts to transitions, you can **manually `tailscale up` at home** (e.g. to use a Mullvad exit node) without the script immediately reverting it. The next time you actually leave and come back, the script will disconnect again.
 
 The key difference is **how** each platform triggers this logic:
 

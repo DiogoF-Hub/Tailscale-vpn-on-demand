@@ -23,10 +23,10 @@ Windows/
 1. **Network change detection**: Windows Task Scheduler monitors network profile changes (Event IDs 10000 and 10002)
 2. **Silent execution**: When triggered, it runs `tailscale-launcher.vbs` (no visible window)
 3. **Connection priority detection**: `tailscale.ps1` first checks for an active physical Ethernet adapter (`Get-NetAdapter -Physical`), and falls back to Wi-Fi SSID detection (`netsh wlan show interfaces`) when no Ethernet is connected. Ethernet is always classified as `away`/untrusted (we can't easily tell home Ethernet from elsewhere).
-4. **Transition-based control**: The script classifies the current network as `home`, `away`, or `none` and compares it against the last trust state stored in `last-state.txt` (next to the script). It only acts when the trust state actually changes:
+4. **Transition-based control**: The script classifies the current network as `home`, `away`, or `none` and compares it against the last trust state stored in `last-state.txt` (next to the script). Away is always enforced; home only acts on a transition:
    - **`away` → `home`** (you came home on Wi-Fi) → Disconnect Tailscale
-   - **`home` → `away`** (you left home, or plugged in Ethernet) → Connect Tailscale
-   - **Same state as before** (e.g. DHCP renewal, Wi-Fi blip, the Tailscale adapter itself coming online) → Do nothing
+   - **Any `away` network** (you left home, plugged in Ethernet, or Tailscale got stopped while away) → Connect Tailscale if `tailscale status` says it isn't running
+   - **`home` → `home`** (e.g. DHCP renewal, Wi-Fi blip, the Tailscale adapter itself coming online) → Do nothing
    - **`none`** (no Ethernet and no Wi-Fi) → Do nothing
 
 This ensures you're always protected on public/external networks (including all Ethernet) while avoiding unnecessary VPN overhead at home Wi-Fi — and crucially, it lets you **manually `tailscale up` while at home** (e.g. to use a Mullvad exit node) without the script immediately undoing it. The next time you actually leave and come back home, the script will disconnect again.
@@ -193,8 +193,8 @@ Example `<Arguments>` line:
 - **Execution policy bypass**: PowerShell runs with `-ExecutionPolicy Bypass` flag to allow unsigned script execution
 - **Ethernet detection**: Uses `Get-NetAdapter -Physical` filtered to `MediaType '802.3'` and `Status 'Up'`. The `-Physical` flag excludes virtual adapters (Tailscale's own, Hyper-V, VPN tunnels) so they don't falsely register as Ethernet.
 - **SSID detection**: Uses `netsh wlan show interfaces` with regex pattern matching to extract the current Wi-Fi SSID (only consulted when no Ethernet is up)
-- **Trust-state machine**: Each run derives a state (`home` / `away` / `none`) and compares it to the previous state stored in `last-state.txt` (written next to `tailscale.ps1`). Only `home↔away` transitions trigger Tailscale changes; `none` is never persisted, so a momentary Wi-Fi drop won't cause a reconnect cycle.
-- **Manual override at home**: Because the script only reacts to transitions, running `tailscale up` yourself while at home is preserved — the resulting NetworkProfile event finds `home → home` and exits without touching Tailscale.
+- **Trust-state machine**: Each run derives a state (`home` / `away` / `none`) and compares it to the previous state stored in `last-state.txt` (written next to `tailscale.ps1`). Arriving home (`away→home`) disconnects; any run on an `away` network connects Tailscale if `tailscale status --json` reports it isn't `Running`. State is not saved if the `tailscale` command fails, so the next run retries; `none` is never persisted, so a momentary Wi-Fi drop won't cause a reconnect cycle.
+- **Manual override at home**: Because home only reacts to transitions, running `tailscale up` yourself while at home is preserved — the resulting NetworkProfile event finds `home → home` and exits without touching Tailscale.
 - **Force re-evaluation**: Delete `last-state.txt` to make the next run treat the current network as a fresh transition.
 - **Elevated privileges**: Task runs with `HighestAvailable` privilege level (required for Tailscale CLI control)
 - **No output logs**: Script writes to stdout but VBScript suppresses all output for clean operation
